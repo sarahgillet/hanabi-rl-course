@@ -33,7 +33,9 @@ from absl import flags
 from hanabi_learning_environment.agents.rainbow.third_party.dopamine import logger
 
 from hanabi_learning_environment.agents.rainbow import run_experiment
-# import run_experiment
+#import run_experiment
+
+import run_experiment_play 
 
 FLAGS = flags.FLAGS
 
@@ -92,7 +94,7 @@ def launch_experiment():
                                                 checkpoint_dir,
                                                 FLAGS.checkpoint_file_prefix))
 
-    run_experiment.run_experiment(
+    run_experiment_play.start_experiment(
         agent,
         environment,
         start_iteration,
