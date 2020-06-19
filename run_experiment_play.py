@@ -289,6 +289,7 @@ class HanabiLiveRainbowAgent(HanabiClient):
                 'action_type': 'discard',
                 'card_index': i
             })
+        # clue moves
         handPartner = state.hands[(state.our_index+1) % 2]
         listColors = []
         listRanks = []
@@ -311,6 +312,23 @@ class HanabiLiveRainbowAgent(HanabiClient):
     def decide_action(self, table_id):
         self.extractCurrentObservationAndLegalActions(table_id)
         super().decide_action(table_id)
+        # action = agent._select_action(observation, legal_actions)
+
+        # # at the end something like this 
+        # super().send(
+        #             'action', {
+        #                 'tableID': table_id,
+        #                 'type': ACTION.RANK_CLUE,
+        #                 'target': target_index,
+        #                 'value': slot_1_card['rank'],
+        #             })
+        # # or this
+        # super().send(
+        #             'action', {
+        #                 'tableID': table_id,
+        #                 'type': ACTION.DISCARD,
+        #                 'target': oldest_card['order'],
+        #             })
 
 
 @gin.configurable
