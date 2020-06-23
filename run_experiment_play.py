@@ -46,7 +46,7 @@ from hanabi_learning_environment.agents.rainbow import dqn_agent
 import tensorflow as tf
 
 from hanabi_live_bot.hanabi_client import HanabiClient
-from hanabi_live_bot.constants import ACTION
+from hanabi_live_bot.constants import ACTION, MAX_CLUE_NUM
 from hanabi_live_bot.connection import establishConnection
 from hanabi_learning_environment.agents.rainbow.run_experiment import format_legal_moves
 LENIENT_SCORE = False
@@ -289,13 +289,14 @@ class HanabiLiveRainbowAgent(HanabiClient):
                 'action_type': ACTION.PLAY,
                 'card_index': i
             })
-        # discard moves
-        for i in range(5):
-            legal_move_list.append({
-                'action_type': ACTION.DISCARD,
-                'card_index': i
-            })
-        # clue moves
+        if state.clue_tokens is not MAX_CLUE_NUM:
+            # discard moves
+            for i in range(5):
+                legal_move_list.append({
+                    'action_type': ACTION.DISCARD,
+                    'card_index': i
+                })
+            # clue moves
         handPartner = state.hands[(state.our_index+1) % 2]
         listColors = []
         listRanks = []
@@ -345,6 +346,7 @@ class HanabiLiveRainbowAgent(HanabiClient):
         if action['action_type'] == ACTION.PLAY or action['action_type'] == ACTION.DISCARD:
             myHand = state.hands[state.our_index]
             message_dict['target'] = myHand[action['card_index']]['order']
+            print(myHand[action['card_index']])
         else:
             message_dict['target'] = (action['target_offset']+state.our_index) % 2
             message_dict['value'] = action['value']
@@ -360,21 +362,6 @@ class HanabiLiveRainbowAgent(HanabiClient):
         print(self.actionToMessage(legal_move_dict[action], table_id))
         super().send('action', self.actionToMessage(legal_move_dict[action], table_id))
 
-        # # at the end something like this 
-        # super().send(
-        #             'action', {
-        #                 'tableID': table_id,
-        #                 'type': ACTION.RANK_CLUE,
-        #                 'target': target_index,
-        #                 'value': slot_1_card['rank'],
-        #             })
-        # # or this
-        # super().send(
-        #             'action', {
-        #                 'tableID': table_id,
-        #                 'type': ACTION.DISCARD,
-        #                 'target': oldest_card['order'],
-        #             })
 
 
 @gin.configurable
