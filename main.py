@@ -89,6 +89,7 @@ def launch_experiment():
     agent = run_experiment.create_agent(environment, obs_stacker)
 
     checkpoint_dir = '{}/checkpoints'.format(FLAGS.base_dir)
+    print(checkpoint_dir)
     start_iteration, experiment_checkpointer = (
         run_experiment.initialize_checkpointing(agent, experiment_logger,
                                                 checkpoint_dir,

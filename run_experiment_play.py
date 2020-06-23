@@ -46,7 +46,9 @@ from hanabi_learning_environment.agents.rainbow import dqn_agent
 import tensorflow as tf
 
 from hanabi_live_bot.hanabi_client import HanabiClient
+from hanabi_live_bot.constants import ACTION
 from hanabi_live_bot.connection import establishConnection
+from hanabi_learning_environment.agents.rainbow.run_experiment import format_legal_moves
 LENIENT_SCORE = False
 
 # to get the environment file for agent login
@@ -268,25 +270,29 @@ class HanabiLiveRainbowAgent(HanabiClient):
         print(currOffset)
         self.obs_stacker.add_observation(vectorizedObs, 0)
         observation_vector = self.obs_stacker.get_observation_stack(0)
-        # legal_moves =
-        self.computeLegalMoves(state)
-        return observation_vector  # , legal_moves
+        legal_moves, legal_move_list_integer = self.computeLegalMoves(state)
+        return observation_vector, legal_moves, legal_move_list_integer
 
     def computeLegalMoves(self, state):
         # MaxDiscardMoves() + MaxPlayMoves() + MaxRevealColorMoves() + MaxRevealRankMoves();
         num_actions = 5 + 5 + 5 + 5
+        maxDiscard = 5
+        maxPlay = 5
+        maxReveal = 5
+        numColors = 5
+        numRanks = 5
         
         legal_move_list = []
         # play moves
         for i in range(5):
             legal_move_list.append({
-                'action_type': 'play',
+                'action_type': ACTION.PLAY,
                 'card_index': i
             })
         # discard moves
         for i in range(5):
             legal_move_list.append({
-                'action_type': 'discard',
+                'action_type': ACTION.DISCARD,
                 'card_index': i
             })
         # clue moves
@@ -298,21 +304,61 @@ class HanabiLiveRainbowAgent(HanabiClient):
             listRanks.append(card['rank'])
         setColor = set(listColors)
         setRanks = set(listRanks)
-        for suit in setColor:
-            legal_move_list.append({'action_type': 'REVEAL_COLOR',
-                                    'color': suit,
-                                    'target_offset': 1})
-        for rank in setRanks:
-            legal_move_list.append({'action_type': 'REVEAL_RANK',
-                                    'color': rank,
-                                    'target_offset': 1})
-        # legal_moves TODO, find where format located
-        #legal_moves = format_legal_moves(legal_moves, num_actions)
+        if state.clue_tokens > 0:
+            for suit in setColor:
+                legal_move_list.append({'action_type': ACTION.COLOR_CLUE,
+                                        'value': suit,
+                                        'target_offset': 1})
+            for rank in setRanks:
+                legal_move_list.append({'action_type': ACTION.RANK_CLUE,
+                                        'value': rank,
+                                        'target_offset': 1})
+        # format to integers
+        legal_move_list_integer = []
+        legal_move_dict = {}
+        for item in legal_move_list:
+            move_uid = -1
+            if item['action_type']==ACTION.DISCARD: #HanabiMove::kDiscard:
+                move_uid = item['card_index'] # return card_index;
+            if item['action_type']==ACTION.PLAY:
+                move_uid = (maxDiscard + item['card_index']) #return MaxDiscardMoves() + card_index;
+            if item['action_type']== ACTION.COLOR_CLUE:  #case HanabiMove::kRevealColor:
+                move_uid = (maxDiscard + maxPlay + \
+                    (item['target_offset']-1)*numColors+item['value']-1) # return MaxDiscardMoves() + MaxPlayMoves() +
+                    #(target_offset - 1) * NumColors() + color;
+            if item['action_type']== ACTION.RANK_CLUE: #case HanabiMove::kRevealRank:
+                move_uid = (maxDiscard + maxPlay + maxReveal + \
+                    (item['target_offset']-1)*numRanks+item['value']-1) #return MaxDiscardMoves() + MaxPlayMoves() + MaxRevealColorMoves() +
+                    # (target_offset - 1) * NumRanks() + rank;
+            legal_move_list_integer.append(move_uid)
+            legal_move_dict[move_uid] = item
+        # format to something else used by the agent
+        legal_moves = format_legal_moves(legal_move_list_integer, num_actions)
+        return legal_moves, legal_move_dict
+
+    def actionToMessage(self, action, table_id):
+        state = self.games[table_id]
+        message_dict = {
+            'tableID': table_id,
+            'type': action['action_type']
+        }
+        if action['action_type'] == ACTION.PLAY or action['action_type'] == ACTION.DISCARD:
+            myHand = state.hands[state.our_index]
+            message_dict['target'] = myHand[action['card_index']]['order']
+        else:
+            message_dict['target'] = (action['target_offset']+state.our_index) % 2
+            message_dict['value'] = action['value']
+        return message_dict
 
     def decide_action(self, table_id):
-        self.extractCurrentObservationAndLegalActions(table_id)
-        super().decide_action(table_id)
+        observation, legal_actions, legal_move_dict = self.extractCurrentObservationAndLegalActions(table_id)
+        action = self.agent._select_action(observation, legal_actions)
+        print(legal_actions, legal_move_dict)
+        print(legal_move_dict[action])
+        #super().decide_action(table_id)
         # action = agent._select_action(observation, legal_actions)
+        print(self.actionToMessage(legal_move_dict[action], table_id))
+        super().send('action', self.actionToMessage(legal_move_dict[action], table_id))
 
         # # at the end something like this 
         # super().send(
