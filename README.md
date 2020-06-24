@@ -9,7 +9,7 @@ pip install -r requirements.txt
 Set up environment variables:
  ```
  cp .env_template .env
- vim .env`
+ vim .env
  ```
 
 Locate the checkpoints from training and run with:
