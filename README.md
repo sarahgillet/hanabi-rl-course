@@ -12,10 +12,7 @@ Set up environment variables:
  vim .env`
  ```
 
-Locate the checkpoints from training.
-
-
-Run with:
+Locate the checkpoints from training and run with:
 ```
 python -um main \
   --base_dir=absolute_path_to_directory_containing_checkpoints_folder \
