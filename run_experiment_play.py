@@ -46,7 +46,7 @@ from hanabi_learning_environment.agents.rainbow import dqn_agent
 import tensorflow as tf
 
 from hanabi_live_bot.hanabi_client import HanabiClient
-from hanabi_live_bot.constants import ACTION, MAX_CLUE_NUM
+from hanabi_live_bot.constants import ACTION, MAX_CLUE_NUM, MAX_TOKENS
 from hanabi_live_bot.connection import establishConnection
 from hanabi_learning_environment.agents.rainbow.run_experiment import format_legal_moves
 LENIENT_SCORE = False
@@ -98,11 +98,17 @@ class HanabiLiveRainbowAgent(HanabiClient):
         state = self.games[table_id]
         vectorizedObs = [0]*658
         currOffset = 0
+        # encode hands
+        numColors = 5
+        numRanks = 5
+        bits_per_card = numColors * numRanks
         # build card vector, only one opponent, pick values of other player
         handOfOtherPlayer = state.hands[(state.our_index+1) % 2]
         for item in handOfOtherPlayer:
+            # we do not know if the handOfOtherPlayer has the cards in order
+            # 
             offsetCard = self.findCardIndex(
-                handOfOtherPlayer, item['order'])*10
+                handOfOtherPlayer, item['order'])*bits_per_card
             if offsetCard < 0:
                 print('error: unable to find card with order ' + str(order) + ' in'
                       'the hand of player ' + str(seat))
@@ -111,32 +117,37 @@ class HanabiLiveRainbowAgent(HanabiClient):
             # 0: Red, 1:Yellow ,2: Green, 3: Blue, 4: Purple
             offsetRank = item['rank']-1
             vectorizedObs[offsetCard+offsetSuit*5+offsetRank] = 1
-            currOffset += 5*5
+        # since hands can have less than 5 cards, leave 0s by moving offset
+        currOffset += 5*bits_per_card
         # bit that tells if hand is full or not (1 = not full)
         vectorizedObs[currOffset] = 0 if len(
             state.hands[state.our_index]) == 5 else 1
         vectorizedObs[currOffset +
                       1] = 0 if len(state.hands[(state.our_index+1) % 2]) == 5 else 1
         currOffset += 2
+        print(currOffset)
+        # encode board
         # fill remaining deck size as thermometer (as many 1's as cards)
         vectorizedObs[currOffset:currOffset +
                       state.num_cards_deck] = [1]*state.num_cards_deck
-        currOffset += 40
-        # fill fireworks (cards placed correctly)
-        for i in range(len(state.play_stacks)):
+        currOffset += 40 # for two players, general: (max_deck_size - hand_size * num_players)
+        # fill fireworks (cards placed correctly), fireworks = play_stacks
+        for i in range(numColors):
+            # fireworks[color] is the number of successfully played <color> cards.
+            # If some were played, one-hot encode the highest (0-indexed) rank played
             if len(state.play_stacks[i]) > 0:
-                offsetStack = currOffset+5*i
-                vectorizedObs[offsetStack:offsetStack +
-                              len(state.play_stacks[i])] = [1]*len(state.play_stacks[i])
-        currOffset += 25  # 25 bits for encoding stack of cards
+                vectorizedObs[currOffset +
+                              len(state.play_stacks[i])] = 1
+            currOffset += numRanks # num_ranks
         # fill information tokens aka clues 8 in thermometer style
         vectorizedObs[currOffset:currOffset +
                       state.clue_tokens] = [1]*state.clue_tokens
-        currOffset += 8  # max num of tokens
+        currOffset += MAX_CLUE_NUM  # max num of clue tokens
         # fill in remaining life tokens
         vectorizedObs[currOffset:currOffset +
                       state.life_tokens] = [1]*state.life_tokens
-        currOffset += 3
+        currOffset += MAX_TOKENS # maxliftokens
+        print(currOffset)
         # encode discard stack
         # for each color
         # // 3 cards of lowest rank (1), 1 card of highest rank (5), 2 of all else. So each color would be
@@ -149,7 +160,7 @@ class HanabiLiveRainbowAgent(HanabiClient):
                 vectorizedObs[currOffset:currOffset+len(state.discard_pile[suit][rank])] = [
                     1] * len(state.discard_pile[suit][rank])
                 currOffset += self.max_pile[rank]
-
+        print(currOffset)
         # for action encoding enum Type { kPlay, kDiscard, kRevealColor, kRevealRank };
         # set index of player that played last action
         index_last_player = 0
@@ -176,11 +187,12 @@ class HanabiLiveRainbowAgent(HanabiClient):
         # in case of color clue, encode color
         if actionCode == 2:
             vectorizedObs[currOffset+state.last_action['clue']['value']] = 1
-        currOffset += 5
+        currOffset += numColors
         # in case of rank clue, encode rank
         if actionCode == 3:
-            vectorizedObs[currOffset+state.last_action['clue']['value']] = 1
-        currOffset += 5
+            # ranks are encoded 1-5  --> -1 to get index
+            vectorizedObs[currOffset+state.last_action['clue']['value']-1] = 1
+        currOffset += numRanks
         # encode reveal outcome, which cards on the hand were hinted
         if actionCode >= 2:
             listTargetClue = state.last_action['list']
@@ -229,29 +241,17 @@ class HanabiLiveRainbowAgent(HanabiClient):
         currOffset += 5
         # encode card
         if (actionCode == 0 or actionCode == 1) and card is not None:
-            # card_index = -1
-            # if state.last_action['type'] != 'strike':
-            #     offsetSuit = state.last_action['which']['suit']
-            #     offsetRank = state.last_action['which']['rank']
-            #     vectorizedObs[currOffset+offsetSuit*5+offsetRank]=1
-            # else:
-            #     # find card on discard pile
-            #     for suit in state.discard_pile:
-            #         for rank in suit:
-            #             for listItem in suit[rank]:
-            #                 if listItem['order'] == state.last_action['order']:
-            #                     offsetSuit = listItem['suit']
-            #                     offsetRank = listItem['rank']
-            #                     vectorizedObs[currOffset+offsetSuit*5+offsetRank]=1
             offsetSuit = card['suit']
-            offsetRank = card['rank']
+            offsetRank = card['rank']-1
+            assert offsetRank > 0, "Offset should not be negative"
             vectorizedObs[currOffset+offsetSuit*5+offsetRank] = 1
-        currOffset += 25
+        currOffset += bits_per_card
         if actionCode == 0 and state.last_action['type'] != 'strike':
             vectorizedObs[currOffset] = 1
         if actionCode == 1:
             vectorizedObs[currOffset+1] = 1
         currOffset += 2
+        print(currOffset)
         # encode clue knowledge
         listHandsOurOrder = [state.hands[state.our_index],
                              state.hands[(state.our_index+1) % 2]]
@@ -267,7 +267,7 @@ class HanabiLiveRainbowAgent(HanabiClient):
                 vectorizedObs[currOffset:currOffset +
                               len(hand[i]['clue'][1])] = hand[i]['clue'][1]
                 currOffset += len(hand[i]['clue'][1])
-        print(currOffset)
+        print("Offset: ",currOffset)
         self.obs_stacker.add_observation(vectorizedObs, 0)
         observation_vector = self.obs_stacker.get_observation_stack(0)
         legal_moves, legal_move_list_integer = self.computeLegalMoves(state)
@@ -325,7 +325,7 @@ class HanabiLiveRainbowAgent(HanabiClient):
                 move_uid = (maxDiscard + item['card_index']) #return MaxDiscardMoves() + card_index;
             if item['action_type']== ACTION.COLOR_CLUE:  #case HanabiMove::kRevealColor:
                 move_uid = (maxDiscard + maxPlay + \
-                    (item['target_offset']-1)*numColors+item['value']-1) # return MaxDiscardMoves() + MaxPlayMoves() +
+                    (item['target_offset']-1)*numColors+item['value']) # return MaxDiscardMoves() + MaxPlayMoves() +
                     #(target_offset - 1) * NumColors() + color;
             if item['action_type']== ACTION.RANK_CLUE: #case HanabiMove::kRevealRank:
                 move_uid = (maxDiscard + maxPlay + maxReveal + \
