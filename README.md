@@ -6,7 +6,13 @@ Install requirements with
 pip install -r requirements.txt
 ```
 
-Run with
+Set up environment variables:
+ ```
+ cp .env_template .env
+ vim .env`
+ ```
+
+Run with:
 ```
 python -um main \
   --base_dir=absolute_path_to_directory_containing_checkpoints_folder \
