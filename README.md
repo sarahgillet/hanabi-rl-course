@@ -9,8 +9,8 @@ The project is three fold:
 The agent was trained using a fork of a Rainbow implementation from [Hanabi Learning Environment](https://github.com/DanielLSM/hanabi-learning-environment). The webserver API used a fork of an [Hanabi live bot](https://github.com/sarahgillet/hanabi-live-bot), and several methods were implemented to transform the state space from the messages sent from the [Hanabi-live](https://hanabi.live/) webserver to be compatible with the state space from the learning framework, and vice-versa for the actions.
 
 To test the code you need to do the following:
-- Download the latest checkpoint of training: 
-- Execute the instructions bellow (tested on Ubuntu 20.0)
+- Download the latest checkpoint of training: https://drive.google.com/file/d/1uzb18nvSMi6jTTm80avlIASbGxOx4KmM/view?usp=sharing
+- Execute the instructions bellow (tested on Ubuntu 16, 18 and 20 on python 3.6,3.7 and 3.8)
 
 (Recommended) Create a simple conda environemnt with python=3.7
 ```
