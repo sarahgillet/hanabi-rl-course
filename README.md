@@ -12,6 +12,8 @@ To test the code you need to do the following:
 - Download the latest checkpoint of training: https://drive.google.com/file/d/1uzb18nvSMi6jTTm80avlIASbGxOx4KmM/view?usp=sharing
 - Execute the instructions bellow (tested on Ubuntu 16, 18 and 20 on python 3.6,3.7 and 3.8)
 
+Video with the bellow installation instructions: https://www.youtube.com/watch?v=B5dL0C_ubwE
+
 (Recommended) Create a simple conda environemnt with python=3.7
 ```
 conda create -n hanabi-bot python=3.7
