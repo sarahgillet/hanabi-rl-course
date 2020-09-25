@@ -2,5 +2,5 @@ git+https://github.com/sarahgillet/hanabi-live-bot.git#egg=hanabi_live_bot
 git+https://github.com/DanielLSM/hanabi-learning-environment.git#egg=hanabi_learning_environment
 absl-py
 gin-config
-tensorflow-gpu==1.15.0
+tensorflow-gpu==1.15.4
 numpy
